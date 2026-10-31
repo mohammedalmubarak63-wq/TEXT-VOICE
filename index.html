@@ -32,7 +32,7 @@
 <body class="min-h-screen pb-12">
 
     <!-- Header Section -->
-    <header class="border-b border-slate-800 bg-slate-900/80 backdrop-blur sticky top-0 z-50">
+    <header class="border-b border-slate-800 bg-slate-900/85 backdrop-blur sticky top-0 z-50">
         <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-lg shadow-cyan-500/20">
@@ -40,11 +40,11 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">VoiceLinguist AI</h1>
-                    <p class="text-xs text-slate-400">المساعد الصوتي للتحويل والتفريغ الذكي</p>
+                    <p class="text-xs text-slate-400">المساعد الصوتي للتحويل والتفريغ الذكي (مُحسّن لمنع التكرار)</p>
                 </div>
             </div>
             <span class="text-xs px-3 py-1 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-300 font-medium">
-                v2.5 Live Agent
+                v2.6 Stable
             </span>
         </div>
     </header>
@@ -65,7 +65,7 @@
             <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-700/80">
                 <div class="flex items-center gap-3">
                     <span class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">1</span>
-                    <h2 class="text-lg font-bold text-white">تفريغ الصوت إلى نص تلقائي (مستمر)</h2>
+                    <h2 class="text-lg font-bold text-white">تفريغ الصوت إلى نص تلقائي (بدون تكرار)</h2>
                 </div>
                 <span id="sttBadge" class="text-xs px-2.5 py-1 rounded-md bg-slate-700 text-slate-300">جاهز للتسجيل</span>
             </div>
@@ -205,14 +205,12 @@
     <script>
         const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
-        // Global States
         let recognition;
         let isRecording = false;
         let isPaused = false;
-        let finalTranscript = '';
+        let confirmedTranscript = ''; // النصوص النهائية الموثوقة لتجنب التكرار
         let voiceSampleFile = null;
 
-        // Elements
         const startBtn = document.getElementById('startBtn');
         const pauseBtn = document.getElementById('pauseBtn');
         const stopBtn = document.getElementById('stopBtn');
@@ -223,7 +221,6 @@
         const statusDot = document.getElementById('statusDot');
         const sttLang = document.getElementById('sttLang');
 
-        // Toast Helper
         function showToast(msg, type = 'error') {
             const toast = document.getElementById('toastAlert');
             const icon = document.getElementById('toastIcon');
@@ -250,17 +247,15 @@
             document.getElementById('toastAlert').classList.add('hidden');
         }
 
-        // Initialize Speech Recognition
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
-            recognition.continuous = true; // التسجيل المستمر دون انقطاع تلقائي
+            recognition.continuous = true;
             recognition.interimResults = true;
 
             recognition.onstart = () => {
                 isRecording = true;
                 isPaused = false;
                 
-                // Styles update
                 startBtn.classList.add('pulse-recording', 'bg-red-600', 'hover:bg-red-500');
                 startBtn.innerHTML = `<i class="fa-solid fa-record-vinyl animate-spin"></i><span>جاري التسجيل...</span>`;
                 
@@ -270,24 +265,35 @@
                 stopBtn.disabled = false;
                 stopBtn.className = "flex items-center justify-center gap-2 bg-red-600 hover:bg-red-500 text-white font-semibold py-3 px-4 rounded-xl transition cursor-pointer shadow-lg shadow-red-600/20 active:scale-95";
 
-                sttStatusText.innerText = "جاري الاستماع المستمر... تحدث الآن.";
+                sttStatusText.innerText = "جاري الاستماع المستمر بدون تكرار... تحدث الآن.";
                 sttStatusText.className = "text-emerald-400 font-medium";
                 statusDot.className = "w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse";
                 sttBadge.innerText = "تسجيل حي نشط";
                 sttBadge.className = "text-xs px-2.5 py-1 rounded-md bg-red-950 text-red-300 border border-red-800";
             };
 
+            // خوارزمية ذكية تمنع تكرار الجمل المكتوبة مسبقاً
             recognition.onresult = (e) => {
                 let interimTranscript = '';
-                for (let i = e.resultIndex; i < e.results.length; i++) {
-                    const transcript = e.results[i][0].transcript;
+                let newFinalSegment = '';
+
+                for (let i = e.resultIndex; i < e.results.length; ++i) {
                     if (e.results[i].isFinal) {
-                        finalTranscript += transcript + ' ';
+                        newFinalSegment += e.results[i][0].transcript + ' ';
                     } else {
-                        interimTranscript += transcript;
+                        interimTranscript += e.results[i][0].transcript;
                     }
                 }
-                sttOutput.value = finalTranscript + interimTranscript;
+
+                // التحقق من عدم تكرار آخر جملة مضافة لمنع التداخل
+                if (newFinalSegment.trim()) {
+                    let cleanedSegment = newFinalSegment.trim();
+                    if (!confirmedTranscript.includes(cleanedSegment)) {
+                        confirmedTranscript += cleanedSegment + ' ';
+                    }
+                }
+
+                sttOutput.value = confirmedTranscript + interimTranscript;
             };
 
             recognition.onerror = (e) => {
@@ -295,7 +301,6 @@
             };
 
             recognition.onend = () => {
-                // إعادة التشغيل أوتوماتيكياً طالما أن المستخدم لم ينقر على توقف مؤقت أو إنهاء
                 if (isRecording && !isPaused) {
                     try { recognition.start(); } catch(err){}
                 }
@@ -353,7 +358,7 @@
             stopBtn.disabled = true;
             stopBtn.className = "flex items-center justify-center gap-2 bg-slate-700 text-slate-400 font-semibold py-3 px-4 rounded-xl transition cursor-not-allowed";
 
-            sttStatusText.innerText = "تم إنهاء التسجيل وتثبيت النص.";
+            sttStatusText.innerText = "تم إنهاء التسجيل وتثبيت النص بنجاح.";
             sttStatusText.className = "text-slate-400";
             statusDot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
             sttBadge.innerText = "جاهز للتسجيل";
@@ -361,11 +366,10 @@
         }
 
         function clearTranscript() {
-            finalTranscript = '';
+            confirmedTranscript = '';
             sttOutput.value = '';
         }
 
-        // Export to Docx File
         function exportToWord() {
             const text = sttOutput.value.trim();
             if (!text) {
@@ -388,7 +392,6 @@
             showToast('تم تصدير ملف Word بنجاح!', 'success');
         }
 
-        // --- SECTION 2: TTS with Mandatory Sample ---
         function handleVoiceSample(event) {
             const file = event.target.files[0];
             const audioPlayer = document.getElementById('audioPlayer');
@@ -414,7 +417,6 @@
                 return;
             }
 
-            // الشرط الإلزامي: عدم السماح بالقراءة بدون رفع عينة صوتية
             if (!voiceSampleFile) {
                 showToast('تنبيه هام: يجب عليك رفع مقطع صوتي مرجعي (عينة الصوت) أولاً لتوليد وقراءة النص صوتاً!', 'error');
                 document.getElementById('voiceSampleInput').focus();
@@ -430,7 +432,6 @@
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = sttLang.value;
 
-            // تطبيق قيم التحكم
             utterance.pitch = parseFloat(document.getElementById('pitchRange').value);
             utterance.rate = parseFloat(document.getElementById('rateRange').value);
 
