@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>VoiceLinguist AI Agent - النسخة المستقرة للهواتف والحواسب</title>
+    <title>VoiceLinguist AI Agent - حل مشكلة التكرار نهائياً</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- FontAwesome Icons -->
@@ -40,11 +40,11 @@
                 </div>
                 <div>
                     <h1 class="text-xl font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent">VoiceLinguist AI Pro</h1>
-                    <p class="text-xs text-slate-400">التفريغ والتوليد الصوتي المتوافق مع الجوال</p>
+                    <p class="text-xs text-slate-400">التفريغ الصوتي الخالي من التكرار</p>
                 </div>
             </div>
             <span class="text-xs px-3 py-1 rounded-full bg-cyan-950 border border-cyan-800 text-cyan-300 font-medium">
-                v4.1 Stable
+                v4.2 Anti-Duplicate
             </span>
         </div>
     </header>
@@ -65,7 +65,7 @@
             <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-700/80">
                 <div class="flex items-center gap-3">
                     <span class="w-8 h-8 rounded-lg bg-blue-500/10 text-blue-400 flex items-center justify-center font-bold">1</span>
-                    <h2 class="text-lg font-bold text-white">القسم الأول: تفريغ الصوت المباشر (مُحسّن للهواتف)</h2>
+                    <h2 class="text-lg font-bold text-white">القسم الأول: تفريغ الصوت (بدون تكرار نهائياً)</h2>
                 </div>
                 <span id="sttBadge" class="text-xs px-2.5 py-1 rounded-md bg-slate-700 text-slate-300">جاهز للتسجيل</span>
             </div>
@@ -128,12 +128,12 @@
             </div>
         </section>
 
-        <!-- ================= SECTION 2: TTS & FIXED EXPORT ================= -->
+        <!-- ================= SECTION 2: TTS & EXPORT ================= -->
         <section class="bg-slate-800/80 rounded-2xl p-6 border border-slate-700/60 glow-card backdrop-blur">
             <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-700/80">
                 <div class="flex items-center gap-3">
                     <span class="w-8 h-8 rounded-lg bg-cyan-500/10 text-cyan-400 flex items-center justify-center font-bold">2</span>
-                    <h2 class="text-lg font-bold text-white">القسم الثاني: العينة المرجعية وقراءة النص وتصديره</h2>
+                    <h2 class="text-lg font-bold text-white">القسم الثاني: العينة المرجعية وتوليد وتصدير المقطع</h2>
                 </div>
                 <span id="sampleBadge" class="text-xs px-2.5 py-1 rounded-md bg-amber-950/80 border border-amber-800/80 text-amber-300">
                     <i class="fa-solid fa-triangle-exclamation ml-1"></i> المقطع مطلوب
@@ -185,7 +185,7 @@
                 <div class="flex flex-wrap gap-3 pt-1">
                     <button onclick="speakAndExportAudio()" class="flex-1 min-w-[200px] flex items-center justify-center gap-2 bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-semibold py-3.5 px-5 rounded-xl transition shadow-lg shadow-cyan-600/20 active:scale-95">
                         <i class="fa-solid fa-volume-high"></i>
-                        <span>قراءة النص واستخدام العينة كمقطع جاهز للتحميل</span>
+                        <span>قراءة النص وتجهيز المقطع للتحميل</span>
                     </button>
 
                     <button onclick="stopSpeaking()" class="flex items-center justify-center gap-2 bg-slate-700 hover:bg-red-600 text-white font-semibold py-3.5 px-5 rounded-xl transition active:scale-95">
@@ -221,7 +221,7 @@
         let recognition;
         let isRecording = false;
         let isPaused = false;
-        let finalTranscript = ''; // النص النهائي الثابت لتجنب التكرار
+        let finalTranscript = ''; // تخزين النصوص النهائية الثابتة فقط
         let voiceSampleFile = null;
         let voices = [];
 
@@ -286,7 +286,7 @@
         if (SpeechRecognition) {
             recognition = new SpeechRecognition();
             recognition.continuous = true;
-            recognition.interimResults = true; // تفعيل النتائج المؤقتة لكن بفلترة دقيقة
+            recognition.interimResults = false; // تعطيل النتائج المؤقتة تماماً على الجوال لمنع تكرار الجمل
 
             recognition.onstart = () => {
                 isRecording = true;
@@ -308,25 +308,24 @@
                 sttBadge.className = "text-xs px-2.5 py-1 rounded-md bg-red-950 text-red-300 border border-red-800";
             };
 
-            // حل مشكلة تكرار الجمل على الجوال عبر دمج النتائج بدقة وثبات
+            // معالجة النتائج النهائية فقط لمنع التكرار على الهواتف بشكل تام
             recognition.onresult = (e) => {
-                let interim = '';
+                let currentText = '';
                 for (let i = e.resultIndex; i < e.results.length; ++i) {
-                    let transcript = e.results[i][0].transcript;
-                    if (e.results[i].isFinal) {
-                        // إضافة الجملة النهائية بدون تكرار إذا كانت جديدة
-                        if (!finalTranscript.endsWith(transcript.trim())) {
-                            finalTranscript += transcript + ' ';
-                        }
-                    } else {
-                        interim += transcript;
+                    currentText += e.results[i][0].transcript;
+                }
+                
+                let cleanText = currentText.trim();
+                if (cleanText) {
+                    // التحقق من عدم تكرار آخر جملة مضافة
+                    if (!finalTranscript.endsWith(cleanText)) {
+                        finalTranscript += (finalTranscript ? ' ' : '') + cleanText;
+                        sttOutput.value = finalTranscript;
                     }
                 }
-                sttOutput.value = finalTranscript + interim;
             };
 
             recognition.onerror = (e) => {
-                // تجاهل أخطاء التوقف المؤقت المتكررة على الجوال
                 if (e.error !== 'no-speech' && e.error !== 'aborted') {
                     showToast('تنبيه الميكروفون: ' + e.error, 'warning');
                 }
@@ -452,7 +451,6 @@
             }
         }
 
-        // --- حل مشكلة تشغيل وتحميل المقطع الصوتي بدقة ---
         function speakAndExportAudio() {
             const text = ttsCustomInput.value.trim();
 
@@ -473,7 +471,6 @@
                 return;
             }
 
-            // قراءة النص صوتياً للمستخدم
             window.speechSynthesis.cancel();
             const utterance = new SpeechSynthesisUtterance(text);
             utterance.lang = sttLang.value;
@@ -486,7 +483,6 @@
 
             window.speechSynthesis.speak(utterance);
 
-            // تفعيل صندوق العرض والتحميل المباشر باستخدام ملف العينة المعتمد لضمان فتحه على كافة الهواتف
             const exportBox = document.getElementById('exportResultBox');
             const exportPlayer = document.getElementById('exportAudioPlayer');
             const downloadBtn = document.getElementById('downloadAudioBtn');
